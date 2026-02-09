@@ -1,0 +1,33 @@
+G3;==================================================
+gG3;QUESTION 3 EXECUTION STARTED: 2026-02-09
+gG3;==================================================
+gG3;--- Running AE Summary Table Script ---
+gG3;ADAE record count: 1191
+gG3;ADSL record count: 306
+gG3;TEAE records in safety population: 1122
+gG3;--------------------------------------------------
+gG3;AE SUMMARY TABLE CREATED SUCCESSFULLY
+gG3;Output: question_3_tlg/ae_summary_table.html
+gG3;--------------------------------------------------
+gG3;--- Running AE Visualization Script ---
+g# A tibble: 10 × 2
+   AETERM                          n
+   <chr>                       <int>
+ 1 PRURITUS                       78
+ 2 APPLICATION SITE PRURITUS      77
+ 3 ERYTHEMA                       56
+ 4 APPLICATION SITE ERYTHEMA      46
+ 5 APPLICATION SITE IRRITATION    41
+ 6 RASH                           40
+ 7 APPLICATION SITE DERMATITIS    36
+ 8 DIZZINESS                      31
+ 9 SKIN IRRITATION                25
+10 SINUS BRADYCARDIA              24
+`height` was translated to `width`.
+G3;Final TEAE checks:
+gG3;Total records: 1122
+gG3;Unique subjects: 217
+gG3;==================================================
+gG3;QUESTION 3 COMPLETED SUCCESSFULLY
+gG3;==================================================
+g
