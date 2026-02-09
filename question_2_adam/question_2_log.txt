@@ -1,0 +1,29 @@
+G3;--------------------------------------------------
+gG3;ADSL DERIVATION STARTED: 2026-02-09
+gG3;--------------------------------------------------
+gG3;Record counts:
+gG3;DM: 306
+gG3;EX: 591
+gG3;AE: 1191
+gG3;VS: 29643
+gG3;DS: 850
+gG3;EX records used for treatment start: 591
+gG3;Preview of final ADSL dataset:
+g# A tibble: 10 × 15
+   STUDYID USUBJID SUBJID SITEID   AGE AGEGR9 AGEGR9N SEX   RACE  ARM   ARMCD TRTSDTM            
+   <chr>   <chr>   <chr>  <chr>  <dbl> <chr>    <dbl> <chr> <chr> <chr> <chr> <dttm>             
+ 1 CDISCP… 01-701… 1015   701       63 >50          3 F     WHITE Plac… Pbo   2014-01-02 00:00:00
+ 2 CDISCP… 01-701… 1023   701       64 >50          3 M     WHITE Plac… Pbo   2012-08-05 00:00:00
+ 3 CDISCP… 01-701… 1028   701       71 >50          3 M     WHITE Xano… Xan_… 2013-07-19 00:00:00
+ 4 CDISCP… 01-701… 1033   701       74 >50          3 M     WHITE Xano… Xan_… 2014-03-18 00:00:00
+ 5 CDISCP… 01-701… 1034   701       77 >50          3 F     WHITE Xano… Xan_… 2014-07-01 00:00:00
+ 6 CDISCP… 01-701… 1047   701       85 >50          3 F     WHITE Plac… Pbo   2013-02-12 00:00:00
+ 7 CDISCP… 01-701… 1057   701       59 >50          3 F     WHITE Scre… Scrn… NA                 
+ 8 CDISCP… 01-701… 1097   701       68 >50          3 M     WHITE Xano… Xan_… 2014-01-01 00:00:00
+ 9 CDISCP… 01-701… 1111   701       81 >50          3 F     WHITE Xano… Xan_… 2012-09-07 00:00:00
+10 CDISCP… 01-701… 1115   701       84 >50          3 M     WHITE Xano… Xan_… 2012-11-30 00:00:00
+# ℹ 3 more variables: TRTSTMF <chr>, ITTFL <chr>, LSTAVLDT <date>
+G3;--------------------------------------------------
+gG3;ADSL DERIVATION COMPLETED
+gG3;--------------------------------------------------
+g
