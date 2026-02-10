@@ -13,7 +13,7 @@ This repository contains solutions for the coding assessment, covering both R-ba
 * **Question 1: SDTM Transformation** – Maps raw data into CDISC SDTM domains using {sdtm.oak}.
 * **Question 2: ADaM Derivation** – Creates subject-level ADSL datasets using {admiral} and {tidyverse}.
 * **Question 3: Reporting (TLG)** – Generates FDA-style tables using {gtsummary} and visualizations using {ggplot2}.
-* **Question 4: GenAI Assistant** – Python-based assistant for querying clinical data using natural language.
+* **Question 4: GenAI Clinical Data Assistant** – A Python project that integrates a LLM (Google Gemini) to enable natural-language querying of clinical trial adverse event data.
 
 ---
 
@@ -45,50 +45,68 @@ This repository contains solutions for the coding assessment, covering both R-ba
 │   └── question_3_log.txt            # Execution log
 ├── question_4_genai/
 │   ├── main.py                    # Entry point for GenAI assistant
-│   ├── config.py                  # Configuration (paths, GEMINI_API_KEY)
+│   ├── config.py                  # Configuration (paths, model, API key)
 │   ├── requirements.txt           # Python dependencies
 │   ├── log.txt                    # Query audit log
 │   ├── data/
-│   │   └── adae.csv               # ADAE dataset for querying
+│   │   └── adae.csv               # ADAE dataset for querying 
 │   ├── scripts/
-│   │   └── export_adae.R          # Optional R export script
+│   │   └── export_adae.R          # Optional R script to export ADAE dataset from pharmaversesdtm::ae
 │   └── src/
-│       ├── __init__.py            # Python package init
+│       ├── __init__.py            # Marks src as a Python package
 │       ├── executor.py            # Executes pandas queries with fallback logic
 │       ├── llm_utils.py           # Interfaces with Gemini API to parse questions
-│       ├── logger.py              # Logs questions and results
+│       ├── logger.py              # Logs questions and results to log.txt
 │       └── schema.py              # Generates dataset schema for LLM grounding
 ```
 ### 🛠️ Setup & Run Instructions
 
-#### R Workflow (Questions 1-3)
+### R Workflow (Questions 1-3)
 
 1. Open `project.Rproj` in RStudio or Posit Cloud.
 2. Restore the R environment by running the following in the R console:
-   `renv::restore()`
+   ```bash
+   renv::restore()
+   ```
 3. Run each script:
-   - `source("question_1_sdtm/01_create_ds_domain.R", echo = FALSE)`
-   - `source("question_2_adam/create_adsl.R", echo = FALSE)`
-   - `source("question_3_tlg/03_question_3_driver.R", echo = FALSE)`
+   ```bash
+   source("question_1_sdtm/01_create_ds_domain.R", echo = FALSE)
+   
+   source("question_2_adam/create_adsl.R", echo = FALSE)
+   
+   source("question_3_tlg/03_question_3_driver.R", echo = FALSE)
+   ```
 4. Outputs and log files are stored in the corresponding folders.
 
-#### Python Workflow (Question 4)
+### Python Workflow (Question 4)
 
 1. Navigate to the folder:
-   `cd question_4_genai`
+   ```bash
+   cd question_4_genai
+   ```
 2. Create and activate a virtual environment:
+   
    **Linux/Mac**
-   `python3 -m venv venv`
-   `source venv/bin/activate`
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate
+   ```
+   
    **Windows**
-   `python -m venv venv`
-   `venv\Scripts\activate`
+   ```bash
+   python -m venv venv
+   venv\Scripts\activate
+   ```
 3. Install dependencies:
-   `pip install -r requirements.txt`
+   ```bash
+   pip install -r requirements.txt
+   ```
 4. Create a `.env` file in `question_4_genai/` with your Gemini API key:
    `GEMINI_API_KEY="your_api_key_here"`
 5. Run the GenAI assistant:
-   `python main.py`
+   ```bash
+   python main.py
+   ```
 6. The results appear in the terminal and are also saved to `question_4_genai/log.txt`.
 
 ---
