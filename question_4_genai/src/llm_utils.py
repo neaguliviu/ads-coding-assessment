@@ -10,10 +10,10 @@ Contains:
 
 import json
 from google import genai
-from config import GEMINI_MODEL
+from config import GEMINI_MODEL, GEMINI_API_KEY
 
 # Initialize Gemini client
-client = genai.Client()
+client = genai.Client(api_key=GEMINI_API_KEY)
 
 def clinical_trial_data_agent(question: str, schema: str) -> dict:
     # Construct prompt for LLM
