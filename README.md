@@ -1,11 +1,12 @@
-# ADS Programmer Coding Assessment
+## ADS Programmer Coding Assessment
 
-**Candidate:** Liviu Neagu
+**Candidate:** Liviu Neagu 
+
 **Focus:** Pharmaverse Ecosystem (R) & GenAI Integration (Python)
 
 ---
 
-## 📖 Overview
+### 📖 Overview
 
 This repository contains solutions for the coding assessment, covering both R-based SDTM/ADaM/TLG tasks and a Python GenAI Clinical Data Assistant. Each question is self-contained in its own folder with data, scripts and logs for reproducibility.
 
@@ -16,8 +17,9 @@ This repository contains solutions for the coding assessment, covering both R-ba
 
 ---
 
-## 📂 Repository Structure
+### 📂 Repository Structure
 
+```text
 .
 ├── .gitignore                     # Git ignore rules
 ├── .Rprofile                      # R project profile settings
@@ -56,44 +58,42 @@ This repository contains solutions for the coding assessment, covering both R-ba
 │       ├── llm_utils.py           # Interfaces with Gemini API to parse questions
 │       ├── logger.py              # Logs questions and results
 │       └── schema.py              # Generates dataset schema for LLM grounding
+```
+### 🛠️ Setup & Run Instructions
 
----
-
-## 🛠️ Setup & Run Instructions
-
-### R Workflow (Questions 1-3)
+#### R Workflow (Questions 1-3)
 
 1. Open `project.Rproj` in RStudio or Posit Cloud.
 2. Restore the R environment by running the following in the R console:
-   renv::restore()
+   `renv::restore()`
 3. Run each script:
-   - source("question_1_sdtm/01_create_ds_domain.R", echo = FALSE)
-   - source("question_2_adam/create_adsl.R", echo = FALSE)
-   - source("question_3_tlg/03_question_3_driver.R", echo = FALSE)
+   - `source("question_1_sdtm/01_create_ds_domain.R", echo = FALSE)`
+   - `source("question_2_adam/create_adsl.R", echo = FALSE)`
+   - `source("question_3_tlg/03_question_3_driver.R", echo = FALSE)`
 4. Outputs and log files are stored in the corresponding folders.
 
-### Python Workflow (Question 4)
+#### Python Workflow (Question 4)
 
 1. Navigate to the folder:
-   cd question_4_genai
+   `cd question_4_genai`
 2. Create and activate a virtual environment:
-   # Linux/Mac
-   python3 -m venv venv
-   source venv/bin/activate
-   # Windows
-   python -m venv venv
-   venv\Scripts\activate
+   **Linux/Mac**
+   `python3 -m venv venv`
+   `source venv/bin/activate`
+   **Windows**
+   `python -m venv venv`
+   `venv\Scripts\activate`
 3. Install dependencies:
-   pip install -r requirements.txt
+   `pip install -r requirements.txt`
 4. Create a `.env` file in `question_4_genai/` with your Gemini API key:
-   GEMINI_API_KEY="your_api_key_here"
+   `GEMINI_API_KEY="your_api_key_here"`
 5. Run the GenAI assistant:
-   python main.py
+   `python main.py`
 6. The results appear in the terminal and are also saved to `question_4_genai/log.txt`.
 
 ---
 
-## ✅ Notes & Best Practices
+#### ✅ Notes & Best Practices
 
 - **Traceability:** Scripts generate log files for traceability.
 - **Modularity:** Solutions are self-contained, with the Python workflow following a modular `src/` structure.
