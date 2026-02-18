@@ -1,238 +1,199 @@
 # ==========================================================================
+# Question 1
 # SDTM DS Domain Creation
 # Package: {sdtm.oak}
 #
 # PURPOSE:
-# Transform raw disposition data into an SDTM-compliant DS domain.
-# The implementation follows a variable-by-variable approach using
-# {sdtm.oak} to ensure traceability between raw source data and SDTM outputs.
+# Transform raw disposition (DS) data into an SDTM-compliant DS domain.
+# The implementation follows a variable-by-variable approach using {sdtm.oak},
+# ensuring traceability between raw source data and SDTM outputs. The approach
+# follows the AE example: https://pharmaverse.github.io/examples/sdtm/ae.html
+# and implements rules from the mock-up eCRF PDF:
+#   - DSTERM:
+#       - If OTHERSP is NULL then DSTERM = IT.DSTERM
+#       - If OTHERSP is not NULL then DSTERM = OTHERSP
+#   - DSDECOD:
+#       - If OTHERSP is NULL then DSDECOD = IT.DSDECOD
+#       - If OTHERSP is not NULL then DSDECOD = OTHERSP
+#   - DSCAT:
+#       - If IT.DSDECOD = "RANDOMIZED" then DSCAT = "PROTOCOL MILESTONE"
+#       - Else DSCAT = "DISPOSITION EVENT"
+#       - If OTHERSP is not NULL then DSCAT = "OTHER EVENT"
+#   - DSDTC:
+#       - DSDTC = DSDTCOL + DSTMCOL in ISO8601 format (MM-DD-YYYY hh:mm)
+#   - DSSTDTC:
+#       - DSSTDTC = IT.DSSTDAT in ISO8601 format (MM-DD-YYYY)
 #
 # INPUT:
 # - pharmaverseraw::ds_raw
-# - study-specific controlled terminology (study_ct.csv)
+# - Study-specific controlled terminology (study_ct.csv)
+# - DM and SV SDTM reference domains (pharmaversesdtm::dm, pharmaversesdtm::sv)
 #
 # OUTPUT:
 # - ds_final.csv
-#
-# ASSUMPTIONS:
-# - Visit numbering is study-specific and hardcoded due to limited metadata.
-# - Some source dates contain inconsistent formats and may not fully parse.
-# - Controlled terminology is limited to the provided codelist extract.
+# - question_1_log.txt (script execution log)
 # ==========================================================================
 
-# --------------------------------------------------------------------------
-# Step 1: Load Required Packages
-# --------------------------------------------------------------------------
-library(pharmaverseraw)
-library(dplyr)
-library(stringr)
-library(sdtm.oak)
 
+# ==========================================================================
+# SDTM.OAK Functions Summary
 # --------------------------------------------------------------------------
-# Step 2: Prepare Output Location
+# Function                   | Purpose
 # --------------------------------------------------------------------------
-# Output directory is created to store the final dataset and log output.
-# This keeps deliverables isolated per question.
-if (!dir.exists("question_1_sdtm")) {
-  dir.create("question_1_sdtm")
-}
+# generate_oak_id_vars()     | Create unique row IDs for traceability between raw and SDTM data
+# assign_no_ct()             | Map raw variables to SDTM without controlled terminology
+# assign_ct()                | Map raw variables to SDTM using controlled terminology (CT)
+# assign_datetime()          | Convert raw date/time columns to ISO8601 format (supports single or combined date+time)
+# derive_seq()               | Assign sequential record numbers per subject (DSSEQ)
+# derive_study_day()         | Calculate study day (DSSTDY) relative to reference date (RFSTDTC) from DM
+# ==========================================================================
 
-# --------------------------------------------------------------------------
-# Step 3: Initialize Logging
-# --------------------------------------------------------------------------
-log_con <- file("question_1_sdtm/question_1_log.txt", open = "wt")
-sink(log_con, type = "output")
-sink(log_con, type = "message")
 
-message("--------------------------------------------------")
-message("SDTM DS DOMAIN CREATION STARTED: ", Sys.Date())
-message("--------------------------------------------------")
+# -----------------------------
+# 1. Load required libraries
+# -----------------------------
+library(sdtm.oak)          # SDTM mapping and derivation functions
+library(pharmaverseraw)    # Raw study datasets
+library(pharmaversesdtm)   # SDTM reference domains (DM, SV)
+library(dplyr)             # Data manipulation functions
 
-# --------------------------------------------------------------------------
-# Step 4: Load and Inspect Raw Data
-# --------------------------------------------------------------------------
-# Raw data is converted to a data.frame to avoid tibble-specific printing
-# behavior during logging and joins.
-raw_data <- pharmaverseraw::ds_raw %>%
-  as.data.frame() %>%
+
+# -----------------------------
+# 2. Read raw DS dataset and SDTM reference domains
+# -----------------------------
+ds_raw <- pharmaverseraw::ds_raw     # Raw DS dataset
+dm     <- pharmaversesdtm::dm        # DM domain (used for DSSTDY derivation)
+sv     <- pharmaversesdtm::sv        # SV domain (used for VISITNUM mapping)
+
+
+# -----------------------------
+# 3. Generate unique row IDs and prepare raw variables
+# -----------------------------
+ds_raw <- ds_raw %>%
   generate_oak_id_vars(
-    pat_var = "PATNUM",
-    raw_src = "ds_raw"
-  )
-
-# Initial inspection to understand available variables and record count.
-message("Raw DS record count: ", nrow(raw_data))
-message("Raw DS variables:")
-print(names(raw_data))
-
-# --------------------------------------------------------------------------
-# Step 5: Light Data Normalization (Observed Issues)
-# --------------------------------------------------------------------------
-# During early inspection and CT mapping attempts, mismatches were observed
-# due to inconsistent casing and trailing spaces in disposition terms.
-# Minimal normalization is applied here to support CT matching.
-raw_data <- raw_data %>%
+    pat_var = "PATNUM",  # Patient identifier used to generate unique row IDs
+    raw_src = "ds_raw"   # Source dataset label
+  ) %>%
   mutate(
-    IT.DSDECOD_CLN = toupper(trimws(IT.DSDECOD)),
-    DSDTCOL        = str_replace_all(trimws(DSDTCOL), "/", "-"),
-    DSTMCOL        = trimws(DSTMCOL),
-    IT.DSSTDAT     = str_replace_all(trimws(IT.DSSTDAT), "/", "-")
-  )
-
-# --------------------------------------------------------------------------
-# Step 6: Load Controlled Terminology
-# --------------------------------------------------------------------------
-# Study-specific CT is loaded from CSV and filtered to the DS codelist.
-study_ct <- read.csv("data/study_ct.csv", stringsAsFactors = FALSE) %>%
-  mutate(
-    collected_value = toupper(trimws(collected_value))
-  )
-
-ds_ct <- study_ct %>%
-  filter(codelist_code == "C66727")
-
-message("Controlled terminology terms available for DS:")
-print(unique(ds_ct$collected_value))
-
-# --------------------------------------------------------------------------
-# Step 7: Define Oak ID Variables
-# --------------------------------------------------------------------------
-# Oak ID variables uniquely identify each raw record and are required
-# for traceable joins across derived variables.
-id_vars <- oak_id_vars()
-
-# --------------------------------------------------------------------------
-# Step 8: Variable Derivations (Oak Objects)
-# --------------------------------------------------------------------------
-
-# DSTERM:
-# Verbatim term carried forward from the source without CT mapping.
-ds_term <- assign_no_ct(
-  raw_dat = raw_data,
-  tgt_var = "DSTERM",
-  raw_var = "IT.DSTERM",
-  id_vars = id_vars
-)
-
-# DSDECOD:
-# Controlled terminology mapping is attempted for all records.
-# Unmapped values are reviewed later and handled via fallback logic.
-ds_decod <- assign_ct(
-  raw_dat = raw_data,
-  tgt_var = "DSDECOD",
-  raw_var = "IT.DSDECOD_CLN",
-  ct_spec = ds_ct,
-  ct_clst = "C66727",
-  id_vars = id_vars
-)
-
-# --------------------------------------------------------------------------
-# Exploratory Check: CT Mapping Coverage
-# --------------------------------------------------------------------------
-# This check is included to understand how many disposition terms were
-# successfully mapped to controlled terminology versus remaining unmapped.
-message("CT mapping coverage check:")
-raw_data %>%
-  count(IT.DSDECOD_CLN %in% ds_ct$collected_value) %>%
-  print()
-
-# --------------------------------------------------------------------------
-# DSDTC:
-# Date/time of disposition event derived using date and time components.
-# Parsing warnings are not suppressed to allow review of problematic records.
-ds_dtc <- assign_datetime(
-  raw_dat = raw_data,
-  tgt_var = "DSDTC",
-  raw_var = c("DSDTCOL", "DSTMCOL"),
-  raw_fmt = c("d-m-y", "H:M"),
-  id_vars = id_vars
-)
-
-# DSSTDTC:
-# Start date of the disposition event.
-ds_stdtc <- assign_datetime(
-  raw_dat = raw_data,
-  tgt_var = "DSSTDTC",
-  raw_var = "IT.DSSTDAT",
-  raw_fmt = "d-m-y",
-  id_vars = id_vars
-)
-
-# --------------------------------------------------------------------------
-# Step 9: Assemble DS Domain and Apply Business Rules
-# --------------------------------------------------------------------------
-ds_final <- raw_data %>%
-  left_join(ds_term,  by = id_vars) %>%
-  left_join(ds_decod, by = id_vars) %>%
-  left_join(ds_dtc,   by = id_vars) %>%
-  left_join(ds_stdtc, by = id_vars) %>%
-  mutate(
-    # If CT mapping is missing, retain normalized source value.
-    DSDECOD = coalesce(DSDECOD, IT.DSDECOD_CLN),
+    # DSTERM: Use OTHERSP if present, otherwise original IT.DSTERM
+    IT.DSTERM  = coalesce(OTHERSP, IT.DSTERM),
     
-    # "Other, Specify" overrides both coded and verbatim terms.
-    DSTERM  = if_else(!is.na(OTHERSP) & OTHERSP != "", OTHERSP, DSTERM),
-    DSDECOD = if_else(!is.na(OTHERSP) & OTHERSP != "", OTHERSP, DSDECOD),
+    # DSDECOD: Uppercase for consistency; OTHERSP overrides IT.DSDECOD
+    IT.DSDECOD = toupper(coalesce(OTHERSP, IT.DSDECOD))
+  )
+
+
+# -----------------------------
+# 4. Read study-specific controlled terminology (CT)
+# -----------------------------
+study_ct <- read.csv("data/study_ct.csv", stringsAsFactors = FALSE)
+
+
+# -----------------------------
+# 5. Map Topic Variable
+# -----------------------------
+ds <- assign_no_ct(
+  raw_dat = ds_raw,        # Raw dataset to map
+  raw_var = "IT.DSTERM",   # Source variable to map (without CT)
+  tgt_var = "DSTERM",      # Target SDTM variable
+  id_vars = oak_id_vars()  # Maintains row-level traceability between raw and SDTM
+)
+
+
+# -----------------------------
+# 6. Map Rest of the Variables
+# -----------------------------
+ds <- ds %>%
+  assign_ct(
+    raw_dat = ds_raw,       
+    raw_var = "IT.DSDECOD", # Source variable to map (with CT)
+    tgt_var = "DSDECOD",
+    ct_spec = study_ct,     # Study-specific CT reference table
+    ct_clst = "C66727",     # CT codelist for DSDECOD (Disposition Event)
+    id_vars = oak_id_vars()
+  ) %>%
+  assign_datetime(
+    raw_dat = ds_raw,
+    raw_var = c("DSDTCOL", "DSTMCOL"),  # Combine date and time columns
+    tgt_var = "DSDTC",
+    raw_fmt = c("m-d-y", "H:M"),        # Input format of raw date/time
+    id_vars = oak_id_vars()
+  ) %>%
+  assign_datetime(
+    raw_dat = ds_raw,
+    raw_var = "IT.DSSTDAT",
+    tgt_var = "DSSTDTC",
+    raw_fmt = c("m-d-y"),
+    id_vars = oak_id_vars()
+  )
+
+
+# -----------------------------
+# 7. Create SDTM derived variables
+# -----------------------------
+ds <- ds %>%
+  mutate(
+    # Populate Required SDTM Identifier Variables (SDTMIG)
+    STUDYID = ds_raw$STUDY,                 # Study identifier (copied from raw STUDY variable)
+    DOMAIN  = "DS",                         # SDTM domain code for Disposition     
+    USUBJID = paste0("01-", ds_raw$PATNUM), # Unique Subject Identifier derived from PATNUM
     
-    # Categorization distinguishes protocol milestones from disposition events.
+    # Convert to uppercase for SDTM consistency and CT alignment
+    DSTERM  = toupper(DSTERM),
+    
+    # Derive DSCAT following mock-up eCRF rules
     DSCAT = case_when(
-      !is.na(OTHERSP) & OTHERSP != "" ~ "OTHER EVENT",
-      IT.DSDECOD_CLN == "RANDOMIZED"  ~ "PROTOCOL MILESTONE",
-      TRUE                            ~ "DISPOSITION EVENT"
+      !is.na(ds_raw$OTHERSP)             ~ "OTHER EVENT",       
+      ds_raw$IT.DSDECOD == "RANDOMIZED"  ~ "PROTOCOL MILESTONE", 
+      TRUE                               ~ "DISPOSITION EVENT"
     ),
     
-    STUDYID = STUDY,
-    DOMAIN  = "DS",
-    USUBJID = paste0(STUDY, "-", PATNUM),
-    VISIT   = INSTANCE,
-    
-    # Visit numbering derived based on observed INSTANCE values.
-    # In a production study, this would typically be sourced from SV
-    # or visit-level metadata; hardcoded here due to assessment scope.
-    VISITNUM = case_when(
-      str_detect(toupper(VISIT), "BASELINE") ~ 10,
-      str_detect(toupper(VISIT), "WEEK 4")   ~ 40,
-      str_detect(toupper(VISIT), "WEEK 26")  ~ 260,
-      TRUE                                   ~ NA_real_
-    ),
-    
-    # Study day not derived due to missing reference start day logic.
-    DSSTDY = NA_integer_
+    # Uppercase to ensure consistent join with SV domain
+    VISIT = toupper(ds_raw$INSTANCE)
   ) %>%
-  # Filter out empty records as per SDTM IG
-  filter(!is.na(DSTERM) & DSTERM != "")
-
-# Add sequence numbers
-ds_final <- ds_final %>%
+  
+  left_join(
+    # Map VISITNUM from SV domain while preserving traceability
+    sv %>% select(USUBJID, VISIT, VISITNUM), # Only required columns
+    by = c("USUBJID", "VISIT")               # Join by subject ID and visit name
+  ) %>%
+  
   derive_seq(
-    tgt_var = "DSSEQ",
-    rec_vars = "USUBJID"
+    # derive_seq() assigns unique sequence numbers per subject for DS records
+    tgt_var = "DSSEQ",                            # SDTM sequence variable
+    rec_vars = c("STUDYID", "USUBJID", "DSSTDTC") # Chronological record number per subject based on DSSTDTC
   ) %>%
+  
+  derive_study_day(
+    # Derive study day (DSSTDY) relative to RFSTDTC from DM
+    sdtm_in = .,            # Current dataset in pipeline
+    dm_domain = dm,         # DM reference domain for RFSTDTC
+    tgdt = "DSSTDTC",       # Target date variable for calculation
+    refdt = "RFSTDTC",      # Reference start date from DM
+    study_day_var = "DSSTDY" # Derived study day variable
+  ) %>%
+  
   select(
-    STUDYID, DOMAIN, USUBJID, DSSEQ,
-    DSTERM, DSDECOD, DSCAT,
-    VISITNUM, VISIT,
-    DSDTC, DSSTDTC, DSSTDY
+    # Final variable selection and ordering
+    STUDYID, DOMAIN, USUBJID, DSSEQ, DSTERM, DSDECOD,
+    DSCAT, VISITNUM, VISIT, DSDTC, DSSTDTC, DSSTDY
   )
 
-# --------------------------------------------------------------------------
-# Step 10: Output and Review
-# --------------------------------------------------------------------------
-write.csv(ds_final, "question_1_sdtm/ds_final.csv", row.names = FALSE)
 
-# Ensure the preview prints even when sink() is active
-message("Preview of final DS dataset:")
-if (nrow(ds_final) > 0) {
-  # Force printing to console/log
-  print(as.data.frame(head(ds_final, 10)))
-} else {
-  message("Warning: ds_final has zero rows after filtering.")
-}
+# -----------------------------
+# 8. Save final DS dataset to CSV
+# -----------------------------
+write.csv(ds, "question_1_sdtm/ds_final.csv", row.names = FALSE)
 
-message("--------------------------------------------------")
-message("SDTM DS DOMAIN CREATION COMPLETED")
-message("--------------------------------------------------")
 
-sink(type = "message")
-sink(type = "output")
-close(log_con)
+# -----------------------------
+# 9. Simple log file to indicate script ran successfully
+# -----------------------------
+log_file <- "question_1_sdtm/question_1_log.txt"
+writeLines(
+  c(
+    paste0("01_create_ds_domain.R executed successfully: ", Sys.time()),
+    "No errors detected."
+  ),
+  con = log_file
+)
